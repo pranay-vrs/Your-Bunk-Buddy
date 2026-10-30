@@ -26,6 +26,7 @@ export default function AttendanceSummary({
             {currentAnalysis.status === 'SAFE' && <CheckCircle2 size={32} className="text-emerald-700" />}
             {currentAnalysis.status === 'SHORTAGE' && <AlertOctagon size={32} className="text-amber-700" />}
             {currentAnalysis.status === 'IRREVERSIBLE' && <AlertOctagon size={32} className="text-rose-700" />}
+            {currentAnalysis.status === 'INVALID' && <AlertOctagon size={32} className="text-amber-700" />}
           </div>
           <div className="banner-content">
             <div className="banner-top">
@@ -54,6 +55,11 @@ export default function AttendanceSummary({
               {currentAnalysis.status === 'IRREVERSIBLE' && (
                 <>
                   Critical Detention Warning! Cannot mathematically reach {minCriteria}% without medical condonation.
+                </>
+              )}
+              {currentAnalysis.status === 'INVALID' && (
+                <>
+                  Input Warning: Attended classes cannot exceed conducted classes.
                 </>
               )}
             </h3>

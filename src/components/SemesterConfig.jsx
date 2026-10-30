@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Percent, BookOpen, Clock, CheckCircle2, ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react';
+import { Calendar, Percent, BookOpen, Clock, CheckCircle2, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Sparkles, TrendingUp } from 'lucide-react';
 import AttendanceChart from './AttendanceChart';
 
 export default function SemesterConfig({
@@ -20,10 +20,12 @@ export default function SemesterConfig({
   isTrackingCurrent,
   setIsTrackingCurrent,
   hasTimetable,
+  subjects = [],
   // Props for the embedded attendance chart
   daysInfo,
   totalSemesterLectures,
-  currentAnalysis
+  currentAnalysis,
+  lecturesPerDay = 6
 }) {
   // Preset Semester Helpers for Indian colleges
   const setPresetOddSemester = () => {
@@ -38,6 +40,21 @@ export default function SemesterConfig({
     setStartDate(`${currentYear}-01-15`);
     setEndDate(`${currentYear}-05-25`);
     if (!minCriteria) setMinCriteria(75);
+  };
+
+  // Check if user has entered subject-level attendance in subjects table
+  const subjectsHeldSum = (subjects || []).reduce(
+    (sum, s) => sum + (Number(s.conducted) || 0),
+    0
+  );
+  const subjectsAttSum = (subjects || []).reduce(
+    (sum, s) => sum + (Number(s.attended) || 0),
+    0
+  );
+
+  const handleAutoFillFromSubjects = () => {
+    setCurrentConducted(subjectsHeldSum);
+    setCurrentAttended(subjectsAttSum);
   };
 
   return (
@@ -177,15 +194,17 @@ export default function SemesterConfig({
         <div
           className="tracking-toggle-header"
           onClick={() => setIsTrackingCurrent(!isTrackingCurrent)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsTrackingCurrent(!isTrackingCurrent);
+            }
+          }}
         >
-          <label className="toggle-container" onClick={(e) => e.stopPropagation()}>
-            <input
-              type="checkbox"
-              checked={isTrackingCurrent}
-              onChange={(e) => setIsTrackingCurrent(e.target.checked)}
-              className="visually-hidden"
-            />
-            <div className="custom-checkbox">
+          <div className="toggle-container">
+            <div className={`custom-checkbox ${isTrackingCurrent ? 'checked' : ''}`}>
               {isTrackingCurrent && <CheckCircle2 size={16} className="text-white" />}
             </div>
             <div className="toggle-text">
@@ -199,33 +218,49 @@ export default function SemesterConfig({
                 Enter classes attended so far to calculate safe bunks, catch-up lectures, and view your semester trajectory graph.
               </span>
             </div>
-          </label>
+          </div>
           <div className="toggle-chevron">
-            {isTrackingCurrent ? <ChevronUp size={18} className="text-slate-500" /> : <ChevronDown size={18} className="text-slate-500" />}
+            {isTrackingCurrent ? (
+              <ChevronUp size={18} className="text-slate-500" />
+            ) : (
+              <ChevronDown size={18} className="text-slate-500" />
+            )}
           </div>
         </div>
 
-        {/* Trajectory Graph directly under Track Current Semester Standing */}
+        {/* Trajectory Graph and Inputs directly under Track Current Semester Standing */}
         {isTrackingCurrent && (
           <div className="tracking-expanded-content">
             <div className="current-inputs-box">
               <div className="form-group">
-                <label htmlFor="curr-conducted" className="form-label">
-                  Classes Conducted So Far
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label htmlFor="curr-conducted" className="form-label mb-0">
+                    Classes Conducted So Far
+                  </label>
+                  {subjectsHeldSum > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleAutoFillFromSubjects}
+                      className="text-xs text-amber-900 font-semibold underline hover:text-amber-950"
+                      title="Sync from subjects table"
+                    >
+                      Fill from subjects ({subjectsHeldSum} held)
+                    </button>
+                  )}
+                </div>
                 <input
                   id="curr-conducted"
                   type="number"
                   min="0"
-                  placeholder="0"
-                  value={currentConducted === 0 ? '' : currentConducted}
+                  placeholder="e.g. 40"
+                  value={currentConducted !== null && currentConducted !== undefined ? currentConducted : ''}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setCurrentConducted(val === '' ? 0 : Math.max(0, Number(val)));
+                    setCurrentConducted(val === '' ? '' : Math.max(0, Number(val)));
                   }}
                   className="input-field"
                 />
-                <span className="helper-text">Total lectures held till date</span>
+                <span className="helper-text">Total lectures held till date across all subjects</span>
               </div>
 
               <div className="form-group">
@@ -236,24 +271,89 @@ export default function SemesterConfig({
                   id="curr-attended"
                   type="number"
                   min="0"
-                  placeholder="0"
-                  value={currentAttended === 0 ? '' : currentAttended}
+                  placeholder="e.g. 32"
+                  value={currentAttended !== null && currentAttended !== undefined ? currentAttended : ''}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setCurrentAttended(val === '' ? 0 : Math.max(0, Number(val)));
+                    setCurrentAttended(val === '' ? '' : Math.max(0, Number(val)));
                   }}
                   className="input-field"
                 />
-                <span className="helper-text">Lectures you were present for</span>
+                <span className="helper-text">Lectures and labs you were present for</span>
               </div>
             </div>
+
+            {/* Live Standing Feedback Card */}
+            {currentAnalysis && (
+              <div
+                className={`current-standing-feedback mt-3 ${
+                  currentAnalysis.status === 'SAFE'
+                    ? 'feedback-safe'
+                    : currentAnalysis.status === 'SHORTAGE'
+                    ? 'feedback-shortage'
+                    : 'feedback-danger'
+                }`}
+              >
+                <div className="flex items-start justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-black text-slate-900">
+                      {currentAnalysis.currentPct}%
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium">
+                      Current Standing (Target: {minCriteria || 75}%)
+                    </span>
+                  </div>
+                  <span
+                    className={`feedback-pill ${
+                      currentAnalysis.status === 'SAFE'
+                        ? 'pill-safe'
+                        : currentAnalysis.status === 'SHORTAGE'
+                        ? 'pill-warning'
+                        : 'pill-danger'
+                    }`}
+                  >
+                    {currentAnalysis.status === 'SAFE' && '✓ In Safe Zone'}
+                    {currentAnalysis.status === 'SHORTAGE' && '⚠️ Shortage Alert'}
+                    {currentAnalysis.status === 'IRREVERSIBLE' && '⛔ Critical Shortage'}
+                    {currentAnalysis.status === 'INVALID' && '⚠️ Input Warning'}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-700 font-semibold mt-1.5 mb-2">
+                  {currentAnalysis.message}
+                </p>
+
+                {currentAnalysis.status !== 'INVALID' && (
+                  <div className="flex items-center gap-3 text-xs text-slate-600 flex-wrap pt-2 border-t border-black/5">
+                    <span>
+                      Attended: <strong>{currentAnalysis.attended}</strong> / {currentAnalysis.conducted}
+                    </span>
+                    <span>•</span>
+                    <span>
+                      Missed: <strong>{currentAnalysis.conducted - currentAnalysis.attended}</strong> classes
+                    </span>
+                    <span>•</span>
+                    {currentAnalysis.safeBunksRightNow > 0 && (
+                      <span className="text-emerald-700 font-semibold">
+                        Safe Bunks Right Now: {currentAnalysis.safeBunksRightNow}
+                      </span>
+                    )}
+                    {currentAnalysis.consecutiveNeededToReach > 0 && (
+                      <span className="text-rose-700 font-semibold">
+                        Need Next: {currentAnalysis.consecutiveNeededToReach} classes
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Semester Attendance Trajectory Graph placed directly here */}
             <div className="mt-4">
               <AttendanceChart
                 daysInfo={daysInfo}
                 totalSemesterLectures={totalSemesterLectures}
-                minCriteria={minCriteria}
+                minCriteria={minCriteria || 75}
                 lecturesPerDay={lecturesPerDay}
                 currentAnalysis={currentAnalysis}
               />

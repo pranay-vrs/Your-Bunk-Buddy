@@ -20,10 +20,10 @@ export default function App() {
   // 2. Timetable Schedule (extracted via Gemini AI Vision)
   const [timetableSchedule, setTimetableSchedule] = useState(null);
 
-  // 3. Mid-semester Tracking - Initially 0
+  // 3. Mid-semester Tracking - Initially empty string
   const [isTrackingCurrent, setIsTrackingCurrent] = useState(false);
-  const [currentConducted, setCurrentConducted] = useState(0);
-  const [currentAttended, setCurrentAttended] = useState(0);
+  const [currentConducted, setCurrentConducted] = useState('');
+  const [currentAttended, setCurrentAttended] = useState('');
 
   // 4. Indian Holidays & Custom College Holidays
   const [disabledHolidayIds, setDisabledHolidayIds] = useState([]);
@@ -49,8 +49,8 @@ export default function App() {
     setPolicyMode('overall');
     setTimetableSchedule(null);
     setIsTrackingCurrent(false);
-    setCurrentConducted(0);
-    setCurrentAttended(0);
+    setCurrentConducted('');
+    setCurrentAttended('');
     setDisabledHolidayIds([]);
     setCustomHolidays([]);
     setSubjects([]);
@@ -125,10 +125,12 @@ export default function App() {
               isTrackingCurrent={isTrackingCurrent}
               setIsTrackingCurrent={setIsTrackingCurrent}
               hasTimetable={hasTimetable}
+              subjects={subjects}
               // Embedded trajectory graph props
               daysInfo={calculationResult.daysInfo}
               totalSemesterLectures={calculationResult.totalSemesterLectures}
               currentAnalysis={calculationResult.currentAnalysis}
+              lecturesPerDay={lecturesPerDay}
             />
           </div>
 

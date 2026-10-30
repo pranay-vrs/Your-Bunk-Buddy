@@ -753,10 +753,63 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.7);
 }
 
+.custom-checkbox.checked,
 input:checked + .custom-checkbox {
   background-color: var(--c-chestnut);
   box-shadow: var(--nm-raised-sm);
   border-color: var(--c-chestnut);
+}
+
+.current-standing-feedback {
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: var(--nm-raised-card);
+  transition: all 0.2s ease;
+}
+
+.feedback-safe {
+  background-color: #f7f9f7;
+  border-color: #bbf7d0;
+}
+
+.feedback-shortage {
+  background-color: #fdfaf6;
+  border-color: var(--c-ochre);
+}
+
+.feedback-danger {
+  background-color: #fdf5f5;
+  border-color: #fecaca;
+}
+
+.feedback-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.pill-safe {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.pill-warning {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.pill-danger {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.invalid-banner {
+  background-color: #fdf5f5;
+  border-color: #fecaca;
 }
 
 .status-pill-toggle {

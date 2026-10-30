@@ -30,18 +30,18 @@ export default function AttendanceChart({
   daysInfo,
   totalSemesterLectures,
   minCriteria = 75,
-  lecturesPerDay,
+  lecturesPerDay = 6,
   currentAnalysis
 }) {
   const [simulatedBunks, setSimulatedBunks] = useState(0);
 
-  const targetCriteria = Number(minCriteria) || 75;
+  const targetCriteria = Number(minCriteria) > 0 ? Number(minCriteria) : 75;
 
   const timelineData = generateTimelineData({
     daysInfo,
     totalSemesterLectures,
     minCriteria: targetCriteria,
-    lecturesPerDay: Number(lecturesPerDay) || 0,
+    lecturesPerDay: Number(lecturesPerDay) > 0 ? Number(lecturesPerDay) : 6,
     currentAnalysis,
     simulatedBunks
   });

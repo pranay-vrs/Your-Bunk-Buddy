@@ -316,11 +316,10 @@ export function calculateAttendance({
 
     if (policyMode === 'overall') {
       // Greedily attend days with highest lectures first to minimize total days on campus
-      // Map every working calendar date to its lecture count
       const workingDaysWithLectures = workingDates.map(wd => ({
         ...wd,
         lectures: dayLecturesMap[wd.dayOfWeek] || 0
-      })).sort((a, b) => b.lectures - a.lectures); // Heaviest days first
+      })).sort((a, b) => b.lectures - a.lectures);
 
       let accumulatedLectures = 0;
       let daysCount = 0;
@@ -335,8 +334,6 @@ export function calculateAttendance({
 
     } else {
       // Policy: 'subject' (Strict per-subject attendance criteria)
-      // Every single subject must reach >= targetCriteria%
-      // We simulate full-day bunks starting from the lightest/safest days:
       const subjectAllowedBunks = {};
       subjectAnalysis.forEach(s => {
         subjectAllowedBunks[s.name] = s.maxBunks;
@@ -347,7 +344,6 @@ export function calculateAttendance({
         subjectBunksTaken[s.name] = 0;
       });
 
-      // Sort working dates ascending by lecture count (bunk lowest lecture days first)
       const workingDaysToBunk = workingDates.map(wd => ({
         ...wd,
         slots: daySlotsMap[wd.dayOfWeek] || []
@@ -355,7 +351,6 @@ export function calculateAttendance({
 
       let fullDaysBunked = 0;
       for (const day of workingDaysToBunk) {
-        // Can we bunk this whole day without violating ANY subject's maxBunks?
         let canBunk = true;
         for (const slot of day.slots) {
           const subName = slot.subject;
@@ -367,7 +362,6 @@ export function calculateAttendance({
         }
 
         if (canBunk && targetCriteria > 0) {
-          // Commit the bunk for all subjects on this day
           day.slots.forEach(slot => {
             const subName = slot.subject;
             const duration = Number(slot.durationSlots) || 1;
@@ -382,12 +376,12 @@ export function calculateAttendance({
     }
 
   } else {
-    // Case 2: Fallback without timetable (Daily lecture count mode)
-    const dailyCount = Number(lecturesPerDay) || 0;
+    // Case 2: Fallback without timetable (Daily lecture load default)
+    const dailyCount = Number(lecturesPerDay) > 0 ? Number(lecturesPerDay) : 6;
     totalSemesterLectures = totalWorkingDays * dailyCount;
     const minLecturesNeeded = Math.ceil(totalSemesterLectures * (targetCriteria / 100));
     
-    minDaysToAttend = dailyCount > 0 ? Math.ceil(minLecturesNeeded / dailyCount) : 0;
+    minDaysToAttend = dailyCount > 0 && targetCriteria > 0 ? Math.ceil(minLecturesNeeded / dailyCount) : 0;
     maxFullDaysBunkable = Math.max(0, totalWorkingDays - minDaysToAttend);
   }
 
@@ -402,49 +396,64 @@ export function calculateAttendance({
   let currentAnalysis = null;
 
   if (conducted !== null && conducted > 0 && attended !== null) {
-    const currentPct = (attended / conducted) * 100;
-    const remainingLectures = Math.max(0, totalSemesterLectures - conducted);
-    const maxPossibleAttendance = attended + remainingLectures;
-    const maxPossiblePct = totalSemesterLectures > 0 ? (maxPossibleAttendance / totalSemesterLectures) * 100 : 0;
-
-    let consecutiveNeededToReach = 0;
-    let safeBunksRightNow = 0;
-    let status = 'SAFE';
-    let message = '';
-
-    if (targetCriteria <= 0) {
-      status = 'SAFE';
-      message = 'Please specify your college attendance criteria (e.g. 75%).';
-    } else if (currentPct >= targetCriteria) {
-      status = 'SAFE';
-      safeBunksRightNow = Math.floor((100 * attended - targetCriteria * conducted) / targetCriteria);
-      message = safeBunksRightNow > 0 
-        ? `You can safely miss ${safeBunksRightNow} more lecture${safeBunksRightNow > 1 ? 's' : ''} right now while staying above ${targetCriteria}%.`
-        : `You are exactly at the threshold (${Math.round(currentPct * 10) / 10}%). Do not miss the next lecture.`;
+    if (attended > conducted) {
+      currentAnalysis = {
+        conducted,
+        attended,
+        currentPct: Math.round((attended / conducted) * 1000) / 10,
+        remainingLectures: Math.max(0, totalSemesterLectures - conducted),
+        maxPossiblePct: 100,
+        consecutiveNeededToReach: 0,
+        safeBunksRightNow: 0,
+        remainingBunksWholeSem: 0,
+        status: 'INVALID',
+        message: 'Classes attended cannot exceed classes conducted. Please adjust your values.'
+      };
     } else {
-      status = 'SHORTAGE';
-      consecutiveNeededToReach = Math.ceil((targetCriteria * conducted - 100 * attended) / (100 - targetCriteria));
-      
-      if (maxPossibleAttendance < minLecturesToAttend) {
-        status = 'IRREVERSIBLE';
-        message = `Alert: Mathematically impossible to reach ${targetCriteria}% with remaining ${remainingLectures} lectures. Maximum achievable is ${Math.round(maxPossiblePct * 10) / 10}%. Medical condonation needed!`;
-      } else {
-        message = `You must attend the next ${consecutiveNeededToReach} lecture${consecutiveNeededToReach > 1 ? 's' : ''} continuously to reach ${targetCriteria}%.`;
-      }
-    }
+      const currentPct = (attended / conducted) * 100;
+      const remainingLectures = Math.max(0, totalSemesterLectures - conducted);
+      const maxPossibleAttendance = attended + remainingLectures;
+      const maxPossiblePct = totalSemesterLectures > 0 ? (maxPossibleAttendance / totalSemesterLectures) * 100 : 0;
 
-    currentAnalysis = {
-      conducted,
-      attended,
-      currentPct: Math.round(currentPct * 10) / 10,
-      remainingLectures,
-      maxPossiblePct: Math.round(maxPossiblePct * 10) / 10,
-      consecutiveNeededToReach: Math.max(0, consecutiveNeededToReach),
-      safeBunksRightNow: Math.max(0, safeBunksRightNow),
-      remainingBunksWholeSem: Math.max(0, (attended + remainingLectures) - minLecturesToAttend),
-      status,
-      message
-    };
+      let consecutiveNeededToReach = 0;
+      let safeBunksRightNow = 0;
+      let status = 'SAFE';
+      let message = '';
+
+      if (targetCriteria <= 0) {
+        status = 'SAFE';
+        message = 'Set your target attendance criteria above (e.g. 75%) to calculate safe bunks.';
+      } else if (currentPct >= targetCriteria) {
+        status = 'SAFE';
+        safeBunksRightNow = Math.floor((100 * attended - targetCriteria * conducted) / targetCriteria);
+        message = safeBunksRightNow > 0 
+          ? `You can safely miss ${safeBunksRightNow} more lecture${safeBunksRightNow > 1 ? 's' : ''} right now while staying above ${targetCriteria}%.`
+          : `You are exactly at the threshold (${Math.round(currentPct * 10) / 10}%). Do not miss the next lecture.`;
+      } else {
+        status = 'SHORTAGE';
+        consecutiveNeededToReach = Math.ceil((targetCriteria * conducted - 100 * attended) / (100 - targetCriteria));
+        
+        if (totalSemesterLectures > 0 && maxPossibleAttendance < minLecturesToAttend) {
+          status = 'IRREVERSIBLE';
+          message = `Alert: Mathematically impossible to reach ${targetCriteria}% with remaining ${remainingLectures} lectures. Maximum achievable is ${Math.round(maxPossiblePct * 10) / 10}%. Medical condonation needed!`;
+        } else {
+          message = `You must attend the next ${consecutiveNeededToReach} lecture${consecutiveNeededToReach > 1 ? 's' : ''} continuously to reach ${targetCriteria}%.`;
+        }
+      }
+
+      currentAnalysis = {
+        conducted,
+        attended,
+        currentPct: Math.round(currentPct * 10) / 10,
+        remainingLectures,
+        maxPossiblePct: Math.round(maxPossiblePct * 10) / 10,
+        consecutiveNeededToReach: Math.max(0, consecutiveNeededToReach),
+        safeBunksRightNow: Math.max(0, safeBunksRightNow),
+        remainingBunksWholeSem: Math.max(0, (attended + remainingLectures) - minLecturesToAttend),
+        status,
+        message
+      };
+    }
   }
 
   return {
@@ -477,6 +486,11 @@ export function generateTimelineData({
     return { labels: [], datasets: [] };
   }
 
+  // Derive realistic daily load
+  const dailyLoad = (totalSemesterLectures > 0 && workingDates.length > 0)
+    ? (totalSemesterLectures / workingDates.length)
+    : (Number(lecturesPerDay) > 0 ? Number(lecturesPerDay) : 6);
+
   const step = Math.max(1, Math.floor(workingDates.length / 15));
   const milestones = [];
   for (let i = 0; i < workingDates.length; i += step) {
@@ -497,10 +511,10 @@ export function generateTimelineData({
   let userTrajectoryData = null;
   let simulatedTrajectoryData = null;
 
-  if (currentAnalysis && currentAnalysis.conducted > 0) {
+  if (currentAnalysis && currentAnalysis.conducted > 0 && currentAnalysis.status !== 'INVALID') {
     const currentClassIndex = Math.min(
       workingDates.length - 1,
-      Math.floor(currentAnalysis.conducted / Math.max(1, lecturesPerDay || 1))
+      Math.floor(currentAnalysis.conducted / Math.max(1, dailyLoad))
     );
 
     userTrajectoryData = milestones.map(m => {
@@ -508,7 +522,7 @@ export function generateTimelineData({
         const progress = m.index / Math.max(1, currentClassIndex);
         return Math.round((currentAnalysis.currentPct * progress + (100 * (1 - progress))) * 10) / 10;
       } else {
-        const futureClassesDone = (m.index - currentClassIndex) * Math.max(1, lecturesPerDay || 1);
+        const futureClassesDone = (m.index - currentClassIndex) * dailyLoad;
         const projectedAttended = currentAnalysis.attended + futureClassesDone;
         const projectedTotal = currentAnalysis.conducted + futureClassesDone;
         return Math.round((projectedAttended / projectedTotal) * 1000) / 10;
@@ -520,7 +534,7 @@ export function generateTimelineData({
         if (m.index <= currentClassIndex) {
           return userTrajectoryData[milestones.indexOf(m)];
         } else {
-          const futureClassesDone = (m.index - currentClassIndex) * Math.max(1, lecturesPerDay || 1);
+          const futureClassesDone = (m.index - currentClassIndex) * dailyLoad;
           const adjustedAttended = Math.max(0, currentAnalysis.attended + Math.max(0, futureClassesDone - simulatedBunks));
           const projectedTotal = currentAnalysis.conducted + futureClassesDone;
           return Math.round((adjustedAttended / projectedTotal) * 1000) / 10;
