@@ -1,15 +1,60 @@
 import { GoogleGenAI, Type } from '@google/genai';
 
 /**
- * Converts a File or Blob into a base64 string (without the data URL prefix)
+ * Converts a File or Blob into a base64 string, auto-downscaling large images
+ * to keep network requests fast and within serverless body limits.
  */
 export function fileToBase64(file) {
   return new Promise((resolve, reject) => {
+    // If it's a PDF, read directly
+    if (file.type === 'application/pdf') {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        resolve({ base64: result.split(',')[1], mimeType: 'application/pdf' });
+      };
+      reader.onerror = (error) => reject(error);
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    // For images, optimize size if dimensions exceed 1800px
     const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      const base64 = result.split(',')[1];
-      resolve(base64);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX_DIM = 1800;
+        let { width, height } = img;
+
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          } else {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+          resolve({ base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' });
+        } else {
+          const rawBase64 = e.target.result.split(',')[1];
+          let mime = file.type || 'image/jpeg';
+          if (mime === 'image/jpg') mime = 'image/jpeg';
+          resolve({ base64: rawBase64, mimeType: mime });
+        }
+      };
+      img.onerror = () => {
+        const rawBase64 = e.target.result.split(',')[1];
+        resolve({ base64: rawBase64, mimeType: file.type || 'image/jpeg' });
+      };
+      img.src = e.target.result;
     };
     reader.onerror = (error) => reject(error);
     reader.readAsDataURL(file);
@@ -17,25 +62,50 @@ export function fileToBase64(file) {
 }
 
 /**
- * Extracts and analyzes college timetable using Gemini Vision
+ * Extracts and analyzes college timetable using Gemini Vision.
+ * Priority 1: Calls secure serverless backend (/api/analyze) running on owner's GEMINI_API_KEY.
+ * Priority 2: If /api/analyze is unavailable (e.g. standalone Vite dev server), falls back to local VITE_GEMINI_API_KEY.
  */
 export async function analyzeTimetableImage(file) {
-  const envKey = import.meta.env.VITE_GEMINI_API_KEY;
-  const localKey = typeof window !== 'undefined' ? localStorage.getItem('user_gemini_api_key') : null;
-  const apiKey = (envKey && envKey.trim()) || (localKey && localKey.trim());
+  const { base64, mimeType } = await fileToBase64(file);
 
-  if (!apiKey) {
+  // 1. Try serverless backend API route (/api/analyze)
+  let backendFailedWith404 = false;
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64Data: base64, mimeType })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return normalizeExtractedTimetable(data);
+    }
+
+    if (res.status === 404) {
+      // Local development without Vercel CLI serverless runner
+      backendFailedWith404 = true;
+    } else {
+      const errorJson = await res.json().catch(() => ({}));
+      throw new Error(errorJson.error || `Server responded with HTTP status ${res.status}`);
+    }
+  } catch (err) {
+    if (!backendFailedWith404 && err.message && !err.message.includes('Failed to fetch')) {
+      throw err;
+    }
+    backendFailedWith404 = true;
+  }
+
+  // 2. Client-side fallback for local development if /api/analyze is 404
+  const localEnvKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!localEnvKey) {
     throw new Error(
-      'Gemini API key is not configured. Please add VITE_GEMINI_API_KEY in your .env file or enter your API key in the app.'
+      'Gemini API is not configured on the server. Please add GEMINI_API_KEY in your Vercel Project Settings -> Environment Variables.'
     );
   }
 
-  const base64Data = await fileToBase64(file);
-  let mimeType = file.type || 'image/jpeg';
-  if (mimeType === 'image/jpg') mimeType = 'image/jpeg';
-
-  const ai = new GoogleGenAI({ apiKey });
-
+  const ai = new GoogleGenAI({ apiKey: localEnvKey.trim() });
   const prompt = `
 You are an expert college academic timetable analyzer.
 Analyze this image or document of a college/university timetable and extract the weekly schedule:
@@ -56,7 +126,7 @@ Rules:
     contents: [
       {
         inlineData: {
-          data: base64Data,
+          data: base64,
           mimeType: mimeType
         }
       },
@@ -113,21 +183,16 @@ Rules:
 
   let response;
   try {
-    // Try current active gemini-3-flash-preview
     response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       ...requestConfig
     });
   } catch (firstErr) {
     console.warn('gemini-3-flash-preview attempt failed, trying gemini-3.8-flash...', firstErr);
-    try {
-      response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        ...requestConfig
-      });
-    } catch (secondErr) {
-      throw secondErr;
-    }
+    response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      ...requestConfig
+    });
   }
 
   const rawJson = response.text;
@@ -155,7 +220,6 @@ export function normalizeExtractedTimetable(parsedData) {
   const subjectCounts = {};
 
   daysList.forEach((dayObj) => {
-    // Normalize day name capitalization
     const matchedDay = dayOrder.find(
       (d) => d.toLowerCase() === (dayObj.dayName || '').toLowerCase().trim()
     );
@@ -166,7 +230,6 @@ export function normalizeExtractedTimetable(parsedData) {
       const slotsCount = Math.max(1, Number(s.durationSlots) || 1);
       const slotType = s.type || 'Theory';
 
-      // Accumulate weekly subject count
       subjectCounts[subjectName] = (subjectCounts[subjectName] || 0) + slotsCount;
 
       return {
@@ -202,4 +265,3 @@ export function normalizeExtractedTimetable(parsedData) {
     subjects: subjectsList
   };
 }
-

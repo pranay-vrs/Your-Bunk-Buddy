@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, FileImage, Sparkles, AlertCircle, CheckCircle2, Trash2, Plus, RefreshCw, Key } from 'lucide-react';
+import { Upload, FileImage, Sparkles, AlertCircle, CheckCircle2, Trash2, Plus, RefreshCw } from 'lucide-react';
 import { analyzeTimetableImage } from '../services/timetableAi';
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -14,10 +14,6 @@ export default function TimetableUploader({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const [activeDayTab, setActiveDayTab] = useState('Monday');
-  const [customApiKey, setCustomApiKey] = useState(
-    typeof window !== 'undefined' ? localStorage.getItem('user_gemini_api_key') || '' : ''
-  );
-  const [showKeyPrompt, setShowKeyPrompt] = useState(false);
 
   const fileInputRef = useRef(null);
 
@@ -62,15 +58,6 @@ export default function TimetableUploader({
       return;
     }
 
-    const envKey = import.meta.env.VITE_GEMINI_API_KEY;
-    const effectiveKey = (envKey && envKey.trim()) || customApiKey.trim();
-
-    if (!effectiveKey) {
-      setShowKeyPrompt(true);
-      setErrorMsg('Gemini API key is required to analyze your timetable.');
-      return;
-    }
-
     setIsAnalyzing(true);
     setErrorMsg(null);
 
@@ -85,10 +72,11 @@ export default function TimetableUploader({
       let userFriendlyMsg = err.message || 'Failed to analyze timetable.';
       
       if (userFriendlyMsg.includes('API_KEY_INVALID') || userFriendlyMsg.includes('403') || userFriendlyMsg.includes('API key not valid')) {
-        setShowKeyPrompt(true);
-        userFriendlyMsg = 'Your Gemini API key appears to be invalid or restricted. Please check your key in .env or update it below.';
+        userFriendlyMsg = 'The configured Gemini API key is invalid or restricted. Please verify your GEMINI_API_KEY in Vercel settings.';
+      } else if (userFriendlyMsg.includes('GEMINI_API_KEY is not configured')) {
+        userFriendlyMsg = 'Website setup required: Please add GEMINI_API_KEY in your Vercel Project Settings -> Environment Variables.';
       } else if (userFriendlyMsg.includes('404')) {
-        userFriendlyMsg = 'Model endpoint error (404). Please try again.';
+        userFriendlyMsg = 'Model endpoint error (404). Please try again in a few moments.';
       } else if (userFriendlyMsg.includes('503') || userFriendlyMsg.includes('high demand')) {
         userFriendlyMsg = 'The AI model is experiencing a brief high-demand spike. Please wait a few seconds and try again.';
       } else if (userFriendlyMsg.includes('Resource has been exhausted') || userFriendlyMsg.includes('429')) {
@@ -98,14 +86,6 @@ export default function TimetableUploader({
       setErrorMsg(userFriendlyMsg);
     } finally {
       setIsAnalyzing(false);
-    }
-  };
-
-  const handleSaveApiKey = () => {
-    if (customApiKey.trim()) {
-      localStorage.setItem('user_gemini_api_key', customApiKey.trim());
-      setShowKeyPrompt(false);
-      setErrorMsg(null);
     }
   };
 
@@ -187,33 +167,6 @@ export default function TimetableUploader({
           </button>
         )}
       </div>
-
-      {/* API Key Modal / Banner if missing */}
-      {showKeyPrompt && (
-        <div className="api-key-banner">
-          <div className="flex items-start gap-2">
-            <Key size={18} className="text-amber-700 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <span className="font-semibold text-xs text-amber-950 block">Gemini API Key Required</span>
-              <p className="text-xs text-amber-900 mt-0.5">
-                Set <code>VITE_GEMINI_API_KEY</code> in your <code>.env</code> file or paste your free Google AI Studio key below:
-              </p>
-              <div className="flex gap-2 mt-2">
-                <input
-                  type="password"
-                  placeholder="Paste Gemini API Key (AIza...)"
-                  value={customApiKey}
-                  onChange={(e) => setCustomApiKey(e.target.value)}
-                  className="input-field text-xs h-9 flex-1"
-                />
-                <button type="button" onClick={handleSaveApiKey} className="primary-btn h-9 text-xs px-3">
-                  Save Key
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Upload Zone (shown when no timetable is parsed yet) */}
       {!hasExtractedData && (
@@ -427,4 +380,3 @@ export default function TimetableUploader({
     </div>
   );
 }
-
