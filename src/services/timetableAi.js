@@ -1,5 +1,3 @@
-import { GoogleGenAI, Type } from '@google/genai';
-
 /**
  * Converts a File or Blob into a base64 string, auto-downscaling large images
  * to keep network requests fast and within serverless body limits.
@@ -62,9 +60,9 @@ export function fileToBase64(file) {
 }
 
 /**
- * Extracts and analyzes college timetable using Gemini Vision.
- * Priority 1: Calls secure serverless backend (/api/analyze) running on owner's GEMINI_API_KEY.
- * Priority 2: If /api/analyze is unavailable (e.g. standalone Vite dev server), falls back to local VITE_GEMINI_API_KEY.
+ * Extracts and analyzes college timetable using OpenAI Vision.
+ * Priority 1: Calls secure serverless backend (/api/analyze) running on owner's OPENAI_API_KEY.
+ * Priority 2: If /api/analyze is unavailable (e.g. standalone Vite dev server), falls back to local VITE_OPENAI_API_KEY.
  */
 export async function analyzeTimetableImage(file) {
   const { base64, mimeType } = await fileToBase64(file);
@@ -84,7 +82,6 @@ export async function analyzeTimetableImage(file) {
     }
 
     if (res.status === 404) {
-      // Local development without Vercel CLI serverless runner
       backendFailedWith404 = true;
     } else {
       const errorJson = await res.json().catch(() => ({}));
@@ -98,17 +95,32 @@ export async function analyzeTimetableImage(file) {
   }
 
   // 2. Client-side fallback for local development if /api/analyze is 404
-  const localEnvKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const localEnvKey = import.meta.env.VITE_OPENAI_API_KEY;
   if (!localEnvKey) {
     throw new Error(
-      'Gemini API is not configured on the server. Please add GEMINI_API_KEY in your Vercel Project Settings -> Environment Variables.'
+      'OpenAI API is not configured on the server. Please add OPENAI_API_KEY in your Vercel Project Settings -> Environment Variables.'
     );
   }
 
-  const ai = new GoogleGenAI({ apiKey: localEnvKey.trim() });
   const prompt = `
 You are an expert college academic timetable analyzer.
-Analyze this image or document of a college/university timetable and extract the weekly schedule:
+Analyze this image of a college/university timetable and extract the weekly schedule.
+
+Output MUST be a single valid JSON object strictly matching this schema:
+{
+  "days": [
+    {
+      "dayName": "Monday",
+      "slots": [
+        {
+          "subject": "Mathematics",
+          "type": "Theory",
+          "durationSlots": 1
+        }
+      ]
+    }
+  ]
+}
 
 Rules:
 1. Identify all working weekdays present (Monday, Tuesday, Wednesday, Thursday, Friday, and Saturday if scheduled).
@@ -122,82 +134,64 @@ Rules:
 6. Classify type as "Theory", "Lab", or "Tutorial".
 `;
 
-  const requestConfig = {
-    contents: [
+  const requestPayload = (modelName) => ({
+    model: modelName,
+    messages: [
       {
-        inlineData: {
-          data: base64,
-          mimeType: mimeType
-        }
+        role: 'system',
+        content: 'You are an expert academic timetable extraction assistant. You always respond with strictly valid JSON only.'
       },
       {
-        text: prompt
-      }
-    ],
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          days: {
-            type: Type.ARRAY,
-            description: 'List of days of the week in the timetable',
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                dayName: {
-                  type: Type.STRING,
-                  description: 'Name of the day: Monday, Tuesday, Wednesday, Thursday, Friday, or Saturday'
-                },
-                slots: {
-                  type: Type.ARRAY,
-                  description: 'List of academic classes/labs on this day',
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      subject: {
-                        type: Type.STRING,
-                        description: 'Clean name of the course/subject'
-                      },
-                      type: {
-                        type: Type.STRING,
-                        description: 'Theory, Lab, or Tutorial'
-                      },
-                      durationSlots: {
-                        type: Type.INTEGER,
-                        description: 'Number of lecture periods this slot occupies (1 for regular lecture, 2 or 3 for long lab)'
-                      }
-                    },
-                    required: ['subject', 'type', 'durationSlots']
-                  }
-                }
-              },
-              required: ['dayName', 'slots']
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          {
+            type: 'image_url',
+            image_url: {
+              url: `data:${mimeType};base64,${base64}`,
+              detail: 'high'
             }
           }
-        },
-        required: ['days']
+        ]
       }
-    }
-  };
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.1,
+    max_tokens: 4096
+  });
 
-  let response;
-  try {
-    response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      ...requestConfig
+  let response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localEnvKey.trim()}`
+    },
+    body: JSON.stringify(requestPayload('gpt-4o'))
+  });
+
+  if (!response.ok) {
+    const errJson = await response.json().catch(() => ({}));
+    console.warn('gpt-4o failed, falling back to gpt-4o-mini...', errJson?.error?.message);
+
+    response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localEnvKey.trim()}`
+      },
+      body: JSON.stringify(requestPayload('gpt-4o-mini'))
     });
-  } catch (firstErr) {
-    console.warn('gemini-3-flash-preview attempt failed, trying gemini-3.8-flash...', firstErr);
-    response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      ...requestConfig
-    });
+
+    if (!response.ok) {
+      const fallbackErr = await response.json().catch(() => ({}));
+      throw new Error(fallbackErr?.error?.message || errJson?.error?.message || 'Failed to analyze timetable with OpenAI.');
+    }
   }
 
-  const rawJson = response.text;
+  const result = await response.json();
+  const rawJson = result.choices?.[0]?.message?.content;
   if (!rawJson) {
-    throw new Error('AI could not extract text or schedule from this timetable image.');
+    throw new Error('AI could not extract schedule from this timetable image.');
   }
 
   const parsed = JSON.parse(rawJson);

@@ -241,7 +241,7 @@ export default function SemesterConfig({
                     <button
                       type="button"
                       onClick={handleAutoFillFromSubjects}
-                      className="text-xs text-amber-900 font-semibold underline hover:text-amber-950"
+                      className="text-xs text-indigo-300 hover:text-white font-semibold underline transition-colors"
                       title="Sync from subjects table"
                     >
                       Fill from subjects ({subjectsHeldSum} held)

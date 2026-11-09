@@ -1,10 +1,38 @@
-/* Clean CSS Reset & Neumorphic Base */
+/* Liquid Glass Design System Base */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #733F2D;
-  background-color: #F2F2F2;
+  
+  /* Liquid Glass 5-Color Palette */
+  --c-royal: #280D8C;
+  --c-electric: #3711BF;
+  --c-midnight: #180E59;
+  --c-obsidian: #070C26;
+  --c-coral: #F24B4B;
+
+  /* Luminous Typography */
+  --text-main: #FFFFFF;
+  --text-secondary: #D9E0FF;
+  --text-muted: #8E9BD8;
+  --text-dim: #606CA6;
+
+  /* Glass Tokens */
+  --glass-bg: rgba(24, 14, 89, 0.45);
+  --glass-bg-hover: rgba(40, 13, 140, 0.55);
+  --glass-well: rgba(7, 12, 38, 0.65);
+  --glass-border: rgba(201, 210, 255, 0.16);
+  --glass-border-specular: rgba(255, 255, 255, 0.32);
+  --glass-glow: 0 16px 40px 0 rgba(7, 12, 38, 0.75), inset 0 1px 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 2px 0 rgba(0, 0, 0, 0.6);
+  --glass-blur: blur(20px) saturate(190%);
+  
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+
+  color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -16,8 +44,9 @@ body {
   padding: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #F2F2F2;
-  color: #733F2D;
+  background-color: var(--c-obsidian);
+  color: var(--text-secondary);
+  overflow-x: hidden;
 }
 
 button, input, select, textarea {

@@ -1,5 +1,3 @@
-import { GoogleGenAI, Type } from '@google/genai';
-
 export const config = {
   api: {
     bodyParser: {
@@ -16,11 +14,11 @@ export default async function handler(req, res) {
   }
 
   // Retrieve key from server environment variables
-  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY;
 
   if (!apiKey || !apiKey.trim()) {
     return res.status(500).json({
-      error: 'GEMINI_API_KEY is not configured on the Vercel server. Please add GEMINI_API_KEY in your Vercel Project Settings -> Environment Variables.'
+      error: 'OPENAI_API_KEY is not configured on the Vercel server. Please add OPENAI_API_KEY in your Vercel Project Settings -> Environment Variables.'
     });
   }
 
@@ -28,14 +26,28 @@ export default async function handler(req, res) {
     const { base64Data, mimeType = 'image/jpeg' } = req.body || {};
 
     if (!base64Data) {
-      return res.status(400).json({ error: 'No image or PDF file data provided.' });
+      return res.status(400).json({ error: 'No image file data provided.' });
     }
-
-    const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
 
     const prompt = `
 You are an expert college academic timetable analyzer.
-Analyze this image or document of a college/university timetable and extract the weekly schedule:
+Analyze this image of a college/university timetable and extract the weekly schedule.
+
+Output MUST be a single valid JSON object strictly matching this schema:
+{
+  "days": [
+    {
+      "dayName": "Monday",
+      "slots": [
+        {
+          "subject": "Mathematics",
+          "type": "Theory",
+          "durationSlots": 1
+        }
+      ]
+    }
+  ]
+}
 
 Rules:
 1. Identify all working weekdays present (Monday, Tuesday, Wednesday, Thursday, Friday, and Saturday if scheduled).
@@ -49,83 +61,64 @@ Rules:
 6. Classify type as "Theory", "Lab", or "Tutorial".
 `;
 
-    const requestConfig = {
-      contents: [
+    const requestPayload = (modelName) => ({
+      model: modelName,
+      messages: [
         {
-          inlineData: {
-            data: base64Data,
-            mimeType: mimeType
-          }
+          role: 'system',
+          content: 'You are an expert academic timetable extraction assistant. You always respond with strictly valid JSON only.'
         },
         {
-          text: prompt
-        }
-      ],
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            days: {
-              type: Type.ARRAY,
-              description: 'List of days of the week in the timetable',
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  dayName: {
-                    type: Type.STRING,
-                    description: 'Name of the day: Monday, Tuesday, Wednesday, Thursday, Friday, or Saturday'
-                  },
-                  slots: {
-                    type: Type.ARRAY,
-                    description: 'List of academic classes/labs on this day',
-                    items: {
-                      type: Type.OBJECT,
-                      properties: {
-                        subject: {
-                          type: Type.STRING,
-                          description: 'Clean name of the course/subject'
-                        },
-                        type: {
-                          type: Type.STRING,
-                          description: 'Theory, Lab, or Tutorial'
-                        },
-                        durationSlots: {
-                          type: Type.INTEGER,
-                          description: 'Number of lecture periods this slot occupies (1 for regular lecture, 2 or 3 for long lab)'
-                        }
-                      },
-                      required: ['subject', 'type', 'durationSlots']
-                    }
-                  }
-                },
-                required: ['dayName', 'slots']
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${base64Data}`,
+                detail: 'high'
               }
             }
-          },
-          required: ['days']
+          ]
         }
-      }
-    };
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.1,
+      max_tokens: 4096
+    });
 
-    let response;
-    try {
-      // Primary model: gemini-3-flash-preview
-      response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        ...requestConfig
+    let openAiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey.trim()}`
+      },
+      body: JSON.stringify(requestPayload('gpt-4o'))
+    });
+
+    if (!openAiRes.ok) {
+      const errBody = await openAiRes.json().catch(() => ({}));
+      console.warn('gpt-4o attempt failed, trying gpt-4o-mini...', errBody?.error?.message);
+
+      openAiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey.trim()}`
+        },
+        body: JSON.stringify(requestPayload('gpt-4o-mini'))
       });
-    } catch (firstErr) {
-      console.warn('gemini-3-flash-preview failed, trying gemini-3.8-flash...', firstErr?.message);
-      response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        ...requestConfig
-      });
+
+      if (!openAiRes.ok) {
+        const fallbackErr = await openAiRes.json().catch(() => ({}));
+        throw new Error(fallbackErr?.error?.message || errBody?.error?.message || `OpenAI error HTTP ${openAiRes.status}`);
+      }
     }
 
-    const rawJson = response.text;
+    const data = await openAiRes.json();
+    const rawJson = data.choices?.[0]?.message?.content;
     if (!rawJson) {
-      return res.status(422).json({ error: 'AI could not extract schedule from this timetable image.' });
+      return res.status(422).json({ error: 'OpenAI could not extract schedule from this timetable image.' });
     }
 
     const parsed = JSON.parse(rawJson);
@@ -133,8 +126,7 @@ Rules:
   } catch (err) {
     console.error('Server error in api/analyze:', err);
     return res.status(500).json({
-      error: err.message || 'Internal server error while analyzing timetable.'
+      error: err.message || 'Internal server error while analyzing timetable with OpenAI.'
     });
   }
 }
-

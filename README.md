@@ -4,7 +4,7 @@
 
 ## ✨ Features
 
-- **Timetable AI Vision Analyzer**: Upload a photo or PDF of your college timetable to automatically extract weekly periods, lab sessions, and subject frequencies using Google Gemini AI.
+- **Timetable AI Vision Analyzer**: Upload a photo or PDF of your college timetable to automatically extract weekly periods, lab sessions, and subject frequencies using OpenAI Vision (GPT-4o).
 - **Accurate College Days Calculation**: Calculates the exact minimum number of days a student actually needs to attend college to meet their criteria (e.g. 75%), and how many whole days can be safely bunked.
 - **Indian Academic Calendar Engine**: Built-in Gazetted, National, and major Indian festival holidays with intelligent weekend de-duplication and custom college vacation support.
 - **Dual Criteria Policies**:
@@ -32,12 +32,12 @@ cd attendance-checking-app
 npm install
 ```
 
-### 3. Configure Gemini API Key
+### 3. Configure OpenAI API Key
 Create a `.env` file in the root directory:
 ```env
-VITE_GEMINI_API_KEY=your_gemini_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
 ```
-*(Get a free key from [Google AI Studio](https://aistudio.google.com/app/apikey))*
+*(On Vercel, add `OPENAI_API_KEY` under Project Settings -> Environment Variables)*
 
 ### 4. Run Development Server
 ```bash

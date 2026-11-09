@@ -17,7 +17,7 @@ export default function App() {
   const [weekendPolicy, setWeekendPolicy] = useState('5-day');
   const [policyMode, setPolicyMode] = useState('overall'); // 'overall' or 'subject'
 
-  // 2. Timetable Schedule (extracted via Gemini AI Vision)
+  // 2. Timetable Schedule (extracted via OpenAI Vision)
   const [timetableSchedule, setTimetableSchedule] = useState(null);
 
   // 3. Mid-semester Tracking - Initially empty string

@@ -71,16 +71,14 @@ export default function TimetableUploader({
       console.error('Timetable AI analysis error:', err);
       let userFriendlyMsg = err.message || 'Failed to analyze timetable.';
       
-      if (userFriendlyMsg.includes('API_KEY_INVALID') || userFriendlyMsg.includes('403') || userFriendlyMsg.includes('API key not valid')) {
-        userFriendlyMsg = 'The configured Gemini API key is invalid or restricted. Please verify your GEMINI_API_KEY in Vercel settings.';
-      } else if (userFriendlyMsg.includes('GEMINI_API_KEY is not configured')) {
-        userFriendlyMsg = 'Website setup required: Please add GEMINI_API_KEY in your Vercel Project Settings -> Environment Variables.';
-      } else if (userFriendlyMsg.includes('404')) {
-        userFriendlyMsg = 'Model endpoint error (404). Please try again in a few moments.';
-      } else if (userFriendlyMsg.includes('503') || userFriendlyMsg.includes('high demand')) {
-        userFriendlyMsg = 'The AI model is experiencing a brief high-demand spike. Please wait a few seconds and try again.';
-      } else if (userFriendlyMsg.includes('Resource has been exhausted') || userFriendlyMsg.includes('429')) {
-        userFriendlyMsg = 'API rate limit reached. Please wait 30 seconds and try again.';
+      if (userFriendlyMsg.includes('API_KEY_INVALID') || userFriendlyMsg.includes('401') || userFriendlyMsg.includes('invalid_api_key')) {
+        userFriendlyMsg = 'The configured OpenAI API key is invalid or restricted. Please verify your OPENAI_API_KEY in Vercel settings.';
+      } else if (userFriendlyMsg.includes('OPENAI_API_KEY is not configured')) {
+        userFriendlyMsg = 'Website setup required: Please add OPENAI_API_KEY in your Vercel Project Settings -> Environment Variables.';
+      } else if (userFriendlyMsg.includes('insufficient_quota') || userFriendlyMsg.includes('exceeded your current quota')) {
+        userFriendlyMsg = 'OpenAI quota exceeded. Please check your OpenAI account billing or quota limits.';
+      } else if (userFriendlyMsg.includes('429')) {
+        userFriendlyMsg = 'OpenAI rate limit reached. Please wait 20 seconds and try again.';
       }
       
       setErrorMsg(userFriendlyMsg);
@@ -232,7 +230,7 @@ export default function TimetableUploader({
                 {isAnalyzing ? (
                   <>
                     <RefreshCw size={16} className="animate-spin" />
-                    <span>Analyzing Timetable with Gemini AI...</span>
+                    <span>Analyzing Timetable with OpenAI...</span>
                   </>
                 ) : (
                   <>

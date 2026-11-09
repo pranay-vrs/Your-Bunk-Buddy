@@ -62,7 +62,7 @@ export default function AttendanceChart({
     {
       label: `Required Target (${targetCriteria}%)`,
       data: timelineData.targetLineData,
-      borderColor: '#D99F59', // ochre honey
+      borderColor: '#F24B4B', // vibrant coral crimson
       borderWidth: 2,
       borderDash: [6, 4],
       pointRadius: 0,
@@ -75,11 +75,12 @@ export default function AttendanceChart({
     datasets.push({
       label: 'Your Trajectory (Attend Remaining Classes)',
       data: timelineData.userTrajectoryData,
-      borderColor: '#733F2D', // deep chestnut
-      backgroundColor: 'rgba(115, 63, 45, 0.08)',
+      borderColor: '#3711BF', // electric indigo
+      backgroundColor: 'rgba(55, 17, 191, 0.25)',
       borderWidth: 2.5,
       pointRadius: 3,
-      pointBackgroundColor: '#733F2D',
+      pointBackgroundColor: '#FFFFFF',
+      pointBorderColor: '#3711BF',
       fill: true,
       tension: 0.15
     });
@@ -88,11 +89,11 @@ export default function AttendanceChart({
       datasets.push({
         label: `Simulated: If you miss ${simulatedBunks} upcoming class${simulatedBunks > 1 ? 'es' : ''}`,
         data: timelineData.simulatedTrajectoryData,
-        borderColor: '#D99962', // terracotta caramel
+        borderColor: '#8E9BD8', // periwinkle lavender
         borderWidth: 2,
         borderDash: [3, 3],
         pointRadius: 3,
-        pointBackgroundColor: '#D99962',
+        pointBackgroundColor: '#F24B4B',
         fill: false,
         tension: 0.15
       });
@@ -102,8 +103,8 @@ export default function AttendanceChart({
     datasets.push({
       label: 'Target Trajectory',
       data: timelineData.targetLineData,
-      borderColor: '#A67153',
-      backgroundColor: 'rgba(166, 113, 83, 0.08)',
+      borderColor: '#3711BF',
+      backgroundColor: 'rgba(55, 17, 191, 0.15)',
       fill: true,
       borderWidth: 2,
       pointRadius: 2,
@@ -120,11 +121,15 @@ export default function AttendanceChart({
         labels: {
           boxWidth: 14,
           font: { family: 'inherit', size: 12 },
-          color: '#733F2D'
+          color: '#FFFFFF'
         }
       },
       tooltip: {
-        backgroundColor: '#733F2D',
+        backgroundColor: 'rgba(24, 14, 89, 0.95)',
+        titleColor: '#FFFFFF',
+        bodyColor: '#D9E0FF',
+        borderColor: 'rgba(55, 17, 191, 0.6)',
+        borderWidth: 1,
         titleFont: { size: 13, weight: '600' },
         bodyFont: { size: 12 },
         padding: 10,
@@ -137,23 +142,23 @@ export default function AttendanceChart({
     scales: {
       x: {
         grid: {
-          color: 'rgba(166, 113, 83, 0.15)'
+          color: 'rgba(201, 210, 255, 0.1)'
         },
         ticks: {
           font: { size: 11 },
-          color: '#8c5b45'
+          color: '#8E9BD8'
         }
       },
       y: {
         min: 0,
         max: 100,
         grid: {
-          color: 'rgba(166, 113, 83, 0.18)'
+          color: 'rgba(201, 210, 255, 0.1)'
         },
         ticks: {
           stepSize: 20,
           font: { size: 11 },
-          color: '#8c5b45',
+          color: '#8E9BD8',
           callback: (value) => `${value}%`
         }
       }
@@ -180,7 +185,8 @@ export default function AttendanceChart({
             <span
               className="badge-dot"
               style={{
-                backgroundColor: currentAnalysis.currentPct >= targetCriteria ? '#16a34a' : '#dc2626'
+                backgroundColor: currentAnalysis.currentPct >= targetCriteria ? '#4ade80' : '#F24B4B',
+                boxShadow: currentAnalysis.currentPct >= targetCriteria ? '0 0 8px #4ade80' : '0 0 8px #F24B4B'
               }}
             ></span>
             Current Standing: <strong>{currentAnalysis.currentPct}%</strong>

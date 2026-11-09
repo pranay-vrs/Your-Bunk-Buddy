@@ -110,7 +110,7 @@ export default function AttendanceSummary({
             <span className="kpi-label">Days to Attend</span>
             <Calendar size={18} className="text-emerald-700" />
           </div>
-          <div className="kpi-value text-emerald-800">{minDaysToAttend}</div>
+          <div className="kpi-value">{minDaysToAttend}</div>
           <div className="kpi-footer">
             <span>out of {totalWorkingDays} working days</span>
             <span className="kpi-subtle">({totalCalendarDays} calendar days)</span>
@@ -121,9 +121,9 @@ export default function AttendanceSummary({
         <div className="kpi-card bunks-card">
           <div className="kpi-label-row">
             <span className="kpi-label">Full Days Allowed Off</span>
-            <SunMedium size={18} className="text-amber-700" />
+            <SunMedium size={18} className="text-rose-500" />
           </div>
-          <div className="kpi-value text-amber-800">{maxFullDaysBunkable}</div>
+          <div className="kpi-value">{maxFullDaysBunkable}</div>
           <div className="kpi-footer">
             <span>Entire college days you can miss</span>
             <span className="kpi-subtle">while meeting {minCriteria}%</span>
@@ -134,9 +134,9 @@ export default function AttendanceSummary({
         <div className="kpi-card">
           <div className="kpi-label-row">
             <span className="kpi-label">Total Semester Lectures</span>
-            <Clock size={18} className="text-slate-500" />
+            <Clock size={18} />
           </div>
-          <div className="kpi-value text-slate-900">{totalSemesterLectures}</div>
+          <div className="kpi-value">{totalSemesterLectures}</div>
           <div className="kpi-footer">
             <span>Scheduled classes & labs</span>
             <span className="kpi-subtle">{hasTimetable ? 'Exact from timetable' : 'Calculated from daily load'}</span>
@@ -147,9 +147,9 @@ export default function AttendanceSummary({
         <div className="kpi-card">
           <div className="kpi-label-row">
             <span className="kpi-label">Must Attend ({minCriteria}%)</span>
-            <GraduationCap size={18} className="text-slate-700" />
+            <GraduationCap size={18} />
           </div>
-          <div className="kpi-value text-slate-900">{minLecturesToAttend}</div>
+          <div className="kpi-value">{minLecturesToAttend}</div>
           <div className="kpi-footer">
             <span>Max {maxAllowedBunks} lecture bunks allowed</span>
           </div>
